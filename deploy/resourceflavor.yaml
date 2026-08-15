@@ -1,0 +1,22 @@
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: gpu-pool
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+    gpu-config-plugin.openshift.io/managed: "true"
+spec:
+  nodeLabels:
+    run.ai/simulated-gpu-node-pool: default
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: vm-flavor
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+spec:
+  nodeLabels:
+    kubernetes.io/os: linux

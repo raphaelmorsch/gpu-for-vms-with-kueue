@@ -1,0 +1,99 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-vm-console
+  namespace: gpu-vm-kueue
+  labels:
+    app: gpu-vm-console
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gpu-vm-console
+  template:
+    metadata:
+      labels:
+        app: gpu-vm-console
+        app.kubernetes.io/name: gpu-vm-kueue
+    spec:
+      serviceAccountName: gpu-vm-console
+      containers:
+        - name: console
+          image: image-registry.openshift-image-registry.svc:5000/gpu-vm-kueue/gpu-vm-console:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: APP_NAMESPACE
+              value: gpu-vm-kueue
+            - name: DEFAULT_VM_NAMESPACE
+              value: gpu-vms
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-vm-console
+  namespace: gpu-vm-kueue
+  labels:
+    app: gpu-vm-console
+    app.kubernetes.io/name: gpu-vm-kueue
+spec:
+  selector:
+    app: gpu-vm-console
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gpu-vm-console
+  namespace: gpu-vm-kueue
+  labels:
+    app: gpu-vm-console
+    app.kubernetes.io/name: gpu-vm-kueue
+spec:
+  to:
+    kind: Service
+    name: gpu-vm-console
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

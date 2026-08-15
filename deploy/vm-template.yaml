@@ -1,0 +1,120 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: fedora-server-gpu-kueue
+  namespace: openshift
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+    template.kubevirt.io/type: vm
+    os.template.kubevirt.io/fedora: "true"
+    workload.template.kubevirt.io/server: "true"
+  annotations:
+    openshift.io/display-name: Fedora Server GPU (Kueue)
+    description: Fedora VM with NVIDIA GPU requests and limits, admitted by Kueue before the virt-launcher pod starts.
+    tags: "kubevirt,fedora,gpu,kueue"
+    iconClass: icon-fedora
+    template.kubevirt.io/provider: GPU VMs with Kueue
+    template.kubevirt.io/provider-url: https://kueue.sigs.k8s.io
+    defaults.template.kubevirt.io/disk: fedora
+    name.os.template.kubevirt.io/fedora: Fedora
+    template.kubevirt.io/version: v1
+objects:
+  - apiVersion: kubevirt.io/v1
+    kind: VirtualMachine
+    metadata:
+      name: ${NAME}
+      labels:
+        app: ${NAME}
+        gpu-vm-kueue.io/managed: "true"
+        kueue.x-k8s.io/queue-name: ${QUEUE}
+        vm.kubevirt.io/template: fedora-server-gpu-kueue
+    spec:
+      runStrategy: Always
+      dataVolumeTemplates:
+        - apiVersion: cdi.kubevirt.io/v1beta1
+          kind: DataVolume
+          metadata:
+            name: ${NAME}
+          spec:
+            sourceRef:
+              kind: DataSource
+              name: fedora
+              namespace: openshift-virtualization-os-images
+            storage:
+              resources:
+                requests:
+                  storage: 30Gi
+      template:
+        metadata:
+          labels:
+            kubevirt.io/domain: ${NAME}
+            kubevirt.io/size: small
+            kueue.x-k8s.io/queue-name: ${QUEUE}
+            gpu-vm-kueue.io/managed: "true"
+            network.kubevirt.io/headlessService: headless
+        spec:
+          domain:
+            cpu:
+              cores: 1
+              sockets: 1
+              threads: 1
+            devices:
+              disks:
+                - name: rootdisk
+                  disk:
+                    bus: virtio
+                - name: cloudinitdisk
+                  disk:
+                    bus: virtio
+              interfaces:
+                - name: default
+                  masquerade: {}
+                  model: virtio
+              rng: {}
+            machine:
+              type: q35
+            memory:
+              guest: 2Gi
+            resources:
+              requests:
+                cpu: "1"
+                memory: 2Gi
+                nvidia.com/gpu: "${GPU_COUNT}"
+              limits:
+                cpu: "1"
+                memory: 2Gi
+                nvidia.com/gpu: "${GPU_COUNT}"
+          networks:
+            - name: default
+              pod: {}
+          subdomain: headless
+          terminationGracePeriodSeconds: 180
+          volumes:
+            - name: rootdisk
+              dataVolume:
+                name: ${NAME}
+            - name: cloudinitdisk
+              cloudInitNoCloud:
+                userData: |-
+                  #cloud-config
+                  user: fedora
+                  password: ${PASSWORD}
+                  chpasswd: { expire: False }
+                  ssh_pwauth: True
+parameters:
+  - name: NAME
+    description: Name of the VirtualMachine
+    generate: expression
+    from: "fedora-gpu-[a-z0-9]{4}"
+    required: true
+  - name: QUEUE
+    description: Kueue LocalQueue name
+    value: default
+  - name: GPU_COUNT
+    description: Number of GPUs in requests and limits
+    value: "1"
+  - name: PASSWORD
+    description: fedora cloud-init password
+    generate: expression
+    from: "[a-z0-9]{10}"

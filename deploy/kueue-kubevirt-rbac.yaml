@@ -1,0 +1,92 @@
+# Grants the Kueue controller ServiceAccount everything it needs to admit,
+# patch and preempt KubeVirt virt-launcher pods and related VirtualMachines.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kueue-kubevirt-integration
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+rules:
+  - apiGroups: ["kubevirt.io"]
+    resources:
+      - virtualmachines
+      - virtualmachineinstances
+      - virtualmachineinstancemigrations
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["kubevirt.io"]
+    resources:
+      - virtualmachines/status
+      - virtualmachineinstances/status
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: ["subresources.kubevirt.io"]
+    resources:
+      - virtualmachines/start
+      - virtualmachines/stop
+      - virtualmachines/restart
+      - virtualmachineinstances/addvolume
+      - virtualmachineinstances/removevolume
+    verbs: ["get", "update"]
+  - apiGroups: ["cdi.kubevirt.io"]
+    resources:
+      - datavolumes
+      - datasources
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/eviction"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["pods/status"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["kubevirt-controller", "kubevirt-handler", "privileged"]
+    verbs: ["use"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kueue-kubevirt-integration
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kueue-kubevirt-integration
+subjects:
+  - kind: ServiceAccount
+    name: kueue-controller-manager
+    namespace: openshift-kueue-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kueue-use-kubevirt-controller-scc
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
+    resourceNames: ["kubevirt-controller"]
+    verbs: ["use"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kueue-use-kubevirt-controller-scc
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kueue-use-kubevirt-controller-scc
+subjects:
+  - kind: ServiceAccount
+    name: kueue-controller-manager
+    namespace: openshift-kueue-operator

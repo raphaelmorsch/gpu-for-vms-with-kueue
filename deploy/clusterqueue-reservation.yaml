@@ -1,0 +1,84 @@
+# Baseline reserved ClusterQueues. The UI can resize GPU quotas later.
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: gpuvm-gpu-vms
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+    gpu-vm-kueue.io/reservation: "true"
+    gpu-vm-kueue.io/namespace: gpu-vms
+spec:
+  cohortName: unreserved
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: gpu-vms
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+        - nvidia.com/gpu
+        - nvidia.com/mig-1g.23gb
+        - nvidia.com/mig-2g.47gb
+        - nvidia.com/mig-3g.93gb
+        - nvidia.com/mig-7g.189gb
+      flavors:
+        - name: gpu-pool
+          resources:
+            - name: cpu
+              nominalQuota: "8"
+            - name: memory
+              nominalQuota: 32Gi
+            - name: nvidia.com/gpu
+              nominalQuota: "1"
+            - name: nvidia.com/mig-1g.23gb
+              nominalQuota: "0"
+            - name: nvidia.com/mig-2g.47gb
+              nominalQuota: "0"
+            - name: nvidia.com/mig-3g.93gb
+              nominalQuota: "0"
+            - name: nvidia.com/mig-7g.189gb
+              nominalQuota: "0"
+---
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: gpuvm-user-user1
+  labels:
+    app.kubernetes.io/name: gpu-vm-kueue
+    app.kubernetes.io/part-of: gpu-for-vms-with-kueue
+    gpu-vm-kueue.io/reservation: "true"
+    gpu-vm-kueue.io/namespace: user-user1
+spec:
+  cohortName: unreserved
+  namespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: user-user1
+  queueingStrategy: BestEffortFIFO
+  resourceGroups:
+    - coveredResources:
+        - cpu
+        - memory
+        - nvidia.com/gpu
+        - nvidia.com/mig-1g.23gb
+        - nvidia.com/mig-2g.47gb
+        - nvidia.com/mig-3g.93gb
+        - nvidia.com/mig-7g.189gb
+      flavors:
+        - name: gpu-pool
+          resources:
+            - name: cpu
+              nominalQuota: "8"
+            - name: memory
+              nominalQuota: 32Gi
+            - name: nvidia.com/gpu
+              nominalQuota: "1"
+            - name: nvidia.com/mig-1g.23gb
+              nominalQuota: "0"
+            - name: nvidia.com/mig-2g.47gb
+              nominalQuota: "0"
+            - name: nvidia.com/mig-3g.93gb
+              nominalQuota: "0"
+            - name: nvidia.com/mig-7g.189gb
+              nominalQuota: "0"
