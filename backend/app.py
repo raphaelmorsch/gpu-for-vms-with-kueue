@@ -30,6 +30,12 @@ GPU_RESOURCES = (
     "nvidia.com/mig-3g.93gb",
     "nvidia.com/mig-7g.189gb",
 )
+KUBEVIRT_RESOURCES = (
+    "ephemeral-storage",
+    "devices.kubevirt.io/kvm",
+    "devices.kubevirt.io/tun",
+    "devices.kubevirt.io/vhost-net",
+)
 STATIC_DIR = Path(__file__).parent / "static"
 
 
@@ -204,12 +210,27 @@ def _ensure_namespace(namespace: str) -> None:
         )
 
 
+def _kubevirt_resource_group() -> dict[str, Any]:
+    """virt-launcher pods always request KVM/TUN devices; cover them like ClusterQueue/default."""
+    return {
+        "coveredResources": list(KUBEVIRT_RESOURCES),
+        "flavors": [
+            {
+                "name": "vm-flavor",
+                "resources": [
+                    {"name": "ephemeral-storage", "nominalQuota": "500Gi"},
+                    {"name": "devices.kubevirt.io/kvm", "nominalQuota": "1000"},
+                    {"name": "devices.kubevirt.io/tun", "nominalQuota": "1000"},
+                    {"name": "devices.kubevirt.io/vhost-net", "nominalQuota": "1000"},
+                ],
+            }
+        ],
+    }
+
+
 def _clusterqueue_body(namespace: str, gpu_resource: str, gpu_count: int, cpu: str, memory: str) -> dict[str, Any]:
     gpu_quotas = {name: "0" for name in GPU_RESOURCES}
-    if gpu_resource not in gpu_quotas:
-        gpu_quotas[gpu_resource] = str(gpu_count)
-    else:
-        gpu_quotas[gpu_resource] = str(gpu_count)
+    gpu_quotas[gpu_resource] = str(gpu_count)
     covered = ["cpu", "memory", *GPU_RESOURCES]
     if gpu_resource not in covered:
         covered.append(gpu_resource)
@@ -240,7 +261,8 @@ def _clusterqueue_body(namespace: str, gpu_resource: str, gpu_count: int, cpu: s
                 {
                     "coveredResources": covered,
                     "flavors": [{"name": "gpu-pool", "resources": flavor_resources}],
-                }
+                },
+                _kubevirt_resource_group(),
             ],
         },
     }
