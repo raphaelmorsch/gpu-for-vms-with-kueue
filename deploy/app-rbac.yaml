@@ -31,7 +31,13 @@ rules:
       - workloads
       - workloads/status
       - cohorts
+      - admissionchecks
+      - topologies
+      - workloadpriorityclasses
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["kueue.openshift.io"]
+    resources: ["kueues"]
+    verbs: ["get", "list", "watch", "update", "patch"]
   - apiGroups: ["kubevirt.io"]
     resources:
       - virtualmachines
@@ -57,6 +63,9 @@ rules:
     verbs: ["get", "list", "create", "update", "patch"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: ["security.openshift.io"]
+    resources: ["securitycontextconstraints"]
     verbs: ["get", "list"]
   - apiGroups: ["apps"]
     resources: ["deployments"]

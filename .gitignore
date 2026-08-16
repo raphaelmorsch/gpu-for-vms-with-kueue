@@ -1,6 +1,8 @@
 node_modules/
 ui/dist/
 ui/node_modules/
+console-plugin/node_modules/
+console-plugin/dist/
 backend/__pycache__/
 backend/.venv/
 .venv/

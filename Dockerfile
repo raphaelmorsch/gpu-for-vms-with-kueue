@@ -9,7 +9,7 @@ WORKDIR /opt/app-root/src
 COPY backend/requirements.txt /opt/app-root/src/requirements.txt
 RUN pip install --no-cache-dir -r /opt/app-root/src/requirements.txt
 
-COPY backend/app.py /opt/app-root/src/app.py
+COPY backend/*.py /opt/app-root/src/
 COPY ui/dist /opt/app-root/src/static
 RUN chown -R 1001:0 /opt/app-root/src
 

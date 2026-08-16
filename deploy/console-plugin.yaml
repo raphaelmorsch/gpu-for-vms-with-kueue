@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-vm-kueue-plugin-nginx
+  namespace: gpu-vm-kueue
+  labels:
+    app: gpu-vm-kueue-plugin
+    app.kubernetes.io/name: gpu-vm-kueue
+data:
+  nginx.conf: |
+    error_log /dev/stderr info;
+    pid /tmp/nginx.pid;
+    events {}
+    http {
+      access_log /dev/stdout;
+      include /etc/nginx/mime.types;
+      default_type application/octet-stream;
+      server {
+        listen 9443 ssl;
+        ssl_certificate /var/serving-cert/tls.crt;
+        ssl_certificate_key /var/serving-cert/tls.key;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        root /opt/app-root/src;
+        location / {
+          try_files $uri $uri/ =404;
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-vm-kueue-plugin
+  namespace: gpu-vm-kueue
+  labels:
+    app: gpu-vm-kueue-plugin
+    app.kubernetes.io/name: gpu-vm-kueue
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: gpu-vm-kueue-plugin-cert
+spec:
+  selector:
+    app: gpu-vm-kueue-plugin
+  ports:
+    - name: https
+      port: 9443
+      targetPort: https
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-vm-kueue-plugin
+  namespace: gpu-vm-kueue
+  labels:
+    app: gpu-vm-kueue-plugin
+    app.kubernetes.io/name: gpu-vm-kueue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gpu-vm-kueue-plugin
+  template:
+    metadata:
+      labels:
+        app: gpu-vm-kueue-plugin
+        app.kubernetes.io/name: gpu-vm-kueue
+    spec:
+      containers:
+        - name: plugin
+          image: image-registry.openshift-image-registry.svc:5000/gpu-vm-kueue/gpu-vm-kueue-plugin:latest
+          imagePullPolicy: Always
+          ports:
+            - name: https
+              containerPort: 9443
+          volumeMounts:
+            - name: serving-cert
+              mountPath: /var/serving-cert
+              readOnly: true
+            - name: nginx-conf
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            tcpSocket:
+              port: https
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      volumes:
+        - name: serving-cert
+          secret:
+            secretName: gpu-vm-kueue-plugin-cert
+        - name: nginx-conf
+          configMap:
+            name: gpu-vm-kueue-plugin-nginx
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: console.openshift.io/v1
+kind: ConsolePlugin
+metadata:
+  name: gpu-vm-kueue-plugin
+  labels:
+    app: gpu-vm-kueue-plugin
+    app.kubernetes.io/name: gpu-vm-kueue
+spec:
+  displayName: GPU VMs + Kueue Manager
+  backend:
+    type: Service
+    service:
+      name: gpu-vm-kueue-plugin
+      namespace: gpu-vm-kueue
+      port: 9443
+      basePath: /

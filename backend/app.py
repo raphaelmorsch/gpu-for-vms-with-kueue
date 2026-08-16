@@ -62,6 +62,13 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def allow_console_iframe(request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = "frame-ancestors *"
+    return response
+
+
 class ReservationRequest(BaseModel):
     namespace: str
     gpu_resource: str = "nvidia.com/gpu"
@@ -790,6 +797,10 @@ def list_workloads(namespace: str | None = None) -> dict[str, Any]:
         )
     return {"items": summarized}
 
+
+from kueue_admin import router as kueue_router
+
+app.include_router(kueue_router)
 
 if STATIC_DIR.is_dir():
     assets = STATIC_DIR / "assets"

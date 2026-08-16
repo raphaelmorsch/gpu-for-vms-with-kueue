@@ -4,6 +4,8 @@ import { Dashboard } from './pages/Dashboard';
 import { Reservations } from './pages/Reservations';
 import { VirtualMachines } from './pages/VirtualMachines';
 import { Workloads } from './pages/Workloads';
+import { QueueManager } from './pages/kueue/QueueManager';
+import { SchedulerManager } from './pages/kueue/SchedulerManager';
 import { Setup } from './pages/Setup';
 
 export const App: React.FunctionComponent = () => (
@@ -13,6 +15,8 @@ export const App: React.FunctionComponent = () => (
       <Route path="/reservations" element={<Reservations />} />
       <Route path="/vms" element={<VirtualMachines />} />
       <Route path="/workloads" element={<Workloads />} />
+      <Route path="/queues" element={<QueueManager />} />
+      <Route path="/scheduler" element={<SchedulerManager />} />
       <Route path="/setup" element={<Setup />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>

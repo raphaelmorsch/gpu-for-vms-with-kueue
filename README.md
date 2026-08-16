@@ -11,6 +11,7 @@ PatternFly UI and cluster bootstrap for reserving NVIDIA GPUs with Kueue and lau
 - Fedora VM template `fedora-server-gpu-kueue`
 - HyperConverged `permittedHostDevices` for `nvidia.com/gpu` and MIG resources
 - PatternFly console at Route `gpu-vm-console`
+- OpenShift Console plugin: **GPU Booking → Special Bookings for VMs**
 
 ## Deploy on the connected cluster
 

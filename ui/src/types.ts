@@ -86,3 +86,99 @@ export interface Workload {
   resources: Record<string, string>;
   creationTimestamp?: string;
 }
+
+export interface CatalogResource {
+  name: string;
+  group: string;
+  label: string;
+  defaultQuota: string;
+  allocatable: number;
+  inUse: boolean;
+}
+
+export interface CatalogFlavor {
+  name: string;
+  nodeLabels: Record<string, string>;
+}
+
+export interface QuotaRow {
+  name: string;
+  flavor: string;
+  nominalQuota: string;
+  borrowingLimit?: string | null;
+  lendingLimit?: string | null;
+}
+
+export interface ClusterQueueItem {
+  name: string;
+  cohort?: string;
+  queueingStrategy: string;
+  stopPolicy: string;
+  selector: { mode: string; namespaces: string[] };
+  preemption: Record<string, unknown>;
+  quotas: QuotaRow[];
+  quota: Record<string, string>;
+  coveredResources: string[];
+  flavors: string[];
+  admittedWorkloads: number;
+  pendingWorkloads: number;
+  reservingWorkloads: number;
+  active: boolean;
+  protected: boolean;
+  managedReservation: boolean;
+}
+
+export interface KueueNamespace {
+  name: string;
+  displayName: string;
+  managed: boolean;
+  system: boolean;
+  protected: boolean;
+}
+
+export interface AdminLocalQueue {
+  name: string;
+  namespace: string;
+  clusterQueue: string;
+  pendingWorkloads: number;
+  admittedWorkloads: number;
+  defaultQueue: boolean;
+}
+
+export interface ResourceFlavorItem {
+  name: string;
+  nodeLabels: Record<string, string>;
+  topologyName?: string;
+}
+
+export interface PermissionCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+  action?: string | null;
+}
+
+export interface KueueDashboard {
+  operator: {
+    available: boolean;
+    detail: string;
+    frameworks: string[];
+    quotaCheckStrategy?: string | null;
+    managementState?: string;
+  };
+  knownFrameworks: string[];
+  namespaces: { managed: number; managedNames: string[]; total: number };
+  clusterQueues: {
+    total: number;
+    active: number;
+    pendingWorkloads: number;
+    admittedWorkloads: number;
+    items: ClusterQueueItem[];
+  };
+  localQueues: number;
+  flavors: string[];
+  workloads: { total: number; admitted: number; pending: number; finished: number };
+  coveredResources: string[];
+  permissions: PermissionCheck[];
+}
+

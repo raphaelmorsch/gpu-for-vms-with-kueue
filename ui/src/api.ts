@@ -1,9 +1,18 @@
 import type {
+  AdminLocalQueue,
+  CatalogFlavor,
+  CatalogResource,
+  ClusterQueueItem,
   GpuResource,
+  KueueDashboard,
+  KueueNamespace,
   LocalQueue,
   NamespaceItem,
   Overview,
+  PermissionCheck,
+  QuotaRow,
   Reservation,
+  ResourceFlavorItem,
   SetupCheck,
   VirtualMachine,
   Workload
@@ -65,5 +74,77 @@ export const api = {
     }),
   deleteVm: (namespace: string, name: string) =>
     request<{ status: string }>(`/api/vms/${namespace}/${name}`, { method: 'DELETE' }),
-  workloads: () => request<{ items: Workload[] }>('/api/workloads')
+  workloads: () => request<{ items: Workload[] }>('/api/workloads'),
+  kueueDashboard: () => request<KueueDashboard>('/api/kueue/dashboard'),
+  kueueCatalog: () => request<{ items: CatalogResource[]; flavors: CatalogFlavor[] }>('/api/kueue/catalog'),
+  kueueNamespaces: () => request<{ items: KueueNamespace[] }>('/api/kueue/namespaces'),
+  manageNamespace: (name: string, body: { managed: boolean; createDefaultLocalQueue?: boolean }) =>
+    request<{ name: string; managed: boolean; createdDefaultLocalQueue: boolean }>(
+      `/api/kueue/namespaces/${name}/manage`,
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+  clusterQueues: () => request<{ items: ClusterQueueItem[] }>('/api/kueue/clusterqueues'),
+  createClusterQueue: (body: {
+    name: string;
+    cohortName?: string | null;
+    queueingStrategy: string;
+    namespaceSelectorMode: string;
+    namespaces: string[];
+    stopPolicy: string;
+    reclaimWithinCohort: string;
+    withinClusterQueue: string;
+    quotas: QuotaRow[];
+  }) => request<{ item: ClusterQueueItem }>('/api/kueue/clusterqueues', { method: 'POST', body: JSON.stringify(body) }),
+  updateClusterQueue: (
+    name: string,
+    body: {
+      name: string;
+      cohortName?: string | null;
+      queueingStrategy: string;
+      namespaceSelectorMode: string;
+      namespaces: string[];
+      stopPolicy: string;
+      reclaimWithinCohort: string;
+      withinClusterQueue: string;
+      quotas: QuotaRow[];
+    }
+  ) => request<{ item: ClusterQueueItem }>(`/api/kueue/clusterqueues/${name}`, { method: 'PUT', body: JSON.stringify(body) }),
+  setClusterQueueStopPolicy: (name: string, stopPolicy: string) =>
+    request<{ item: ClusterQueueItem }>(`/api/kueue/clusterqueues/${name}/stop-policy`, {
+      method: 'POST',
+      body: JSON.stringify({ stopPolicy })
+    }),
+  deleteClusterQueue: (name: string) =>
+    request<{ status: string }>(`/api/kueue/clusterqueues/${name}`, { method: 'DELETE' }),
+  adminLocalQueues: (namespace?: string) =>
+    request<{ items: AdminLocalQueue[] }>(
+      namespace ? `/api/kueue/localqueues?namespace=${namespace}` : '/api/kueue/localqueues'
+    ),
+  createLocalQueue: (body: { name: string; namespace: string; clusterQueue: string; defaultQueue: boolean }) =>
+    request<{ item: AdminLocalQueue }>('/api/kueue/localqueues', { method: 'POST', body: JSON.stringify(body) }),
+  updateLocalQueue: (
+    namespace: string,
+    name: string,
+    body: { name: string; namespace: string; clusterQueue: string; defaultQueue: boolean }
+  ) =>
+    request<{ item: AdminLocalQueue }>(`/api/kueue/localqueues/${namespace}/${name}`, {
+      method: 'PUT',
+      body: JSON.stringify(body)
+    }),
+  deleteLocalQueue: (namespace: string, name: string) =>
+    request<{ status: string }>(`/api/kueue/localqueues/${namespace}/${name}`, { method: 'DELETE' }),
+  flavors: () => request<{ items: ResourceFlavorItem[] }>('/api/kueue/flavors'),
+  createFlavor: (body: { name: string; nodeLabels: Record<string, string> }) =>
+    request<{ item: ResourceFlavorItem }>('/api/kueue/flavors', { method: 'POST', body: JSON.stringify(body) }),
+  updateFlavor: (name: string, body: { name: string; nodeLabels: Record<string, string> }) =>
+    request<{ item: ResourceFlavorItem }>(`/api/kueue/flavors/${name}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteFlavor: (name: string) => request<{ status: string }>(`/api/kueue/flavors/${name}`, { method: 'DELETE' }),
+  integrations: () => request<{ frameworks: string[]; knownFrameworks: string[]; available: boolean }>('/api/kueue/integrations'),
+  saveIntegrations: (frameworks: string[]) =>
+    request<{ frameworks: string[] }>('/api/kueue/integrations', {
+      method: 'PUT',
+      body: JSON.stringify({ frameworks })
+    }),
+  permissions: () => request<{ checks: PermissionCheck[] }>('/api/kueue/permissions'),
+  grantKubevirtPermissions: () => request<{ status: string; checks: PermissionCheck[] }>('/api/kueue/permissions/kubevirt', { method: 'POST' })
 };

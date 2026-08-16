@@ -1,0 +1,70 @@
+[
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": false,
+      "path": "/gpu-booking/vms",
+      "component": { "$codeRef": "SpecialBookingsPage" }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "gpu-vm-special-bookings",
+      "name": "Special Bookings for VMs",
+      "href": "/gpu-booking/vms",
+      "perspective": "admin",
+      "section": "gpu-booking",
+      "insertAfter": "gpu-bookings",
+      "startsWith": ["/gpu-booking/vms"]
+    }
+  },
+  {
+    "type": "console.navigation/section",
+    "properties": {
+      "id": "kueue-manager",
+      "name": "Kueue Manager",
+      "perspective": "admin",
+      "insertAfter": "gpu-booking"
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": false,
+      "path": "/kueue-manager/queues",
+      "component": { "$codeRef": "QueueManagerPage" }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "kueue-manager-queues",
+      "name": "Queue Manager",
+      "href": "/kueue-manager/queues",
+      "perspective": "admin",
+      "section": "kueue-manager",
+      "startsWith": ["/kueue-manager/queues"]
+    }
+  },
+  {
+    "type": "console.page/route",
+    "properties": {
+      "exact": false,
+      "path": "/kueue-manager/scheduler",
+      "component": { "$codeRef": "SchedulerManagerPage" }
+    }
+  },
+  {
+    "type": "console.navigation/href",
+    "properties": {
+      "id": "kueue-manager-scheduler",
+      "name": "Scheduler Manager",
+      "href": "/kueue-manager/scheduler",
+      "perspective": "admin",
+      "section": "kueue-manager",
+      "insertAfter": "kueue-manager-queues",
+      "startsWith": ["/kueue-manager/scheduler"]
+    }
+  }
+]
