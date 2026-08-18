@@ -4,12 +4,12 @@ import {
   Button,
   EmptyState,
   EmptyStateBody,
+  FormSelect,
+  FormSelectOption,
   Label,
-  PageSection,
   SearchInput,
   Spinner,
   Switch,
-  Title,
   Toolbar,
   ToolbarContent,
   ToolbarItem
@@ -17,18 +17,21 @@ import {
 import CubesIcon from '@patternfly/react-icons/dist/esm/icons/cubes-icon';
 import { Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { api } from '../../api';
-import type { KueueNamespace } from '../../types';
+import type { KueueNamespace, PriorityClassItem } from '../../types';
 
 export const NamespacesPanel: React.FunctionComponent = () => {
   const [items, setItems] = useState<KueueNamespace[]>([]);
+  const [priorityClasses, setPriorityClasses] = useState<PriorityClassItem[]>([]);
   const [filter, setFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const result = await api.kueueNamespaces();
+    const [result, classes] = await Promise.all([api.kueueNamespaces(), api.priorityClasses()]);
     setItems(result.items);
+    setPriorityClasses(classes.items);
   }, []);
 
   useEffect(() => {
@@ -49,9 +52,35 @@ export const NamespacesPanel: React.FunctionComponent = () => {
 
   const onToggle = async (item: KueueNamespace, managed: boolean) => {
     setError(null);
+    setInfo(null);
     setPending(item.name);
     try {
       await api.manageNamespace(item.name, { managed, createDefaultLocalQueue: true });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const onPriority = async (item: KueueNamespace, priorityClass: string, applyToExisting: boolean) => {
+    setError(null);
+    setInfo(null);
+    setPending(item.name);
+    try {
+      const result = await api.setNamespacePriority(item.name, {
+        priorityClass: priorityClass || null,
+        applyToExisting
+      });
+      if (applyToExisting && result.applied) {
+        const extra = result.applied.errors.length
+          ? ` ${result.applied.errors.length} aviso(s).`
+          : '';
+        setInfo(
+          `${item.name}: aplicado a ${result.applied.workloads} workload(s), ${result.applied.virtualMachines} VM(s).${extra}`
+        );
+      }
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -64,11 +93,17 @@ export const NamespacesPanel: React.FunctionComponent = () => {
     <>
       <p>
         Namespaces com o rótulo <code>kueue.openshift.io/managed=true</code> passam a ser validados pelo webhook do
-        Kueue. Ao ativar, a UI cria a LocalQueue <strong>default</strong> se ela ainda não existir.
+        Kueue. Ao ativar, a UI cria a LocalQueue <strong>default</strong> se ela ainda não existir. A classe de
+        prioridade default aplica-se às VMs novas desta UI; use Aplicar para os workloads já existentes.
       </p>
       {error && (
         <Alert variant="danger" title="Erro nos namespaces" isInline>
           {error}
+        </Alert>
+      )}
+      {info && (
+        <Alert variant="success" title="Namespace actualizado" isInline>
+          {info}
         </Alert>
       )}
       <Toolbar id="kueue-namespaces-toolbar">
@@ -100,6 +135,7 @@ export const NamespacesPanel: React.FunctionComponent = () => {
               <Th>Namespace</Th>
               <Th>Tipo</Th>
               <Th>Gestão Kueue</Th>
+              <Th>Priority class</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -126,6 +162,41 @@ export const NamespacesPanel: React.FunctionComponent = () => {
                       void onToggle(item, checked);
                     }}
                   />
+                </Td>
+                <Td dataLabel="Priority class">
+                  {item.system || item.protected || !item.managed ? (
+                    '—'
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <FormSelect
+                        id={`kueue-prio-${item.name}`}
+                        value={item.defaultPriorityClass || ''}
+                        isDisabled={pending === item.name}
+                        onChange={(_event, value) => {
+                          void onPriority(item, value, false);
+                        }}
+                        aria-label={`Priority class de ${item.name}`}
+                      >
+                        <FormSelectOption value="" label="Nenhuma" />
+                        {priorityClasses.map((cls) => (
+                          <FormSelectOption
+                            key={cls.name}
+                            value={cls.name}
+                            label={`${cls.name} (${cls.value})`}
+                          />
+                        ))}
+                      </FormSelect>
+                      <Button
+                        variant="secondary"
+                        isDisabled={pending === item.name || !item.defaultPriorityClass}
+                        onClick={() => {
+                          void onPriority(item, item.defaultPriorityClass || '', true);
+                        }}
+                      >
+                        Aplicar
+                      </Button>
+                    </div>
+                  )}
                 </Td>
               </Tr>
             ))}

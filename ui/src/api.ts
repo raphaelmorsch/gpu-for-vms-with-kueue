@@ -10,10 +10,13 @@ import type {
   NamespaceItem,
   Overview,
   PermissionCheck,
+  PriorityApplyResult,
+  PriorityClassItem,
   QuotaRow,
   Reservation,
   ResourceFlavorItem,
   SetupCheck,
+  TopologyItem,
   VirtualMachine,
   Workload
 } from './types';
@@ -134,11 +137,56 @@ export const api = {
   deleteLocalQueue: (namespace: string, name: string) =>
     request<{ status: string }>(`/api/kueue/localqueues/${namespace}/${name}`, { method: 'DELETE' }),
   flavors: () => request<{ items: ResourceFlavorItem[] }>('/api/kueue/flavors'),
-  createFlavor: (body: { name: string; nodeLabels: Record<string, string> }) =>
+  createFlavor: (body: { name: string; nodeLabels: Record<string, string>; topologyName?: string | null }) =>
     request<{ item: ResourceFlavorItem }>('/api/kueue/flavors', { method: 'POST', body: JSON.stringify(body) }),
-  updateFlavor: (name: string, body: { name: string; nodeLabels: Record<string, string> }) =>
+  updateFlavor: (name: string, body: { name: string; nodeLabels: Record<string, string>; topologyName?: string | null }) =>
     request<{ item: ResourceFlavorItem }>(`/api/kueue/flavors/${name}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteFlavor: (name: string) => request<{ status: string }>(`/api/kueue/flavors/${name}`, { method: 'DELETE' }),
+  topologies: () =>
+    request<{
+      items: TopologyItem[];
+      suggestedLevels: string[];
+      availableNodeLabels: string[];
+      flavors: ResourceFlavorItem[];
+    }>('/api/kueue/topologies'),
+  createTopology: (body: { name: string; levels: string[] }) =>
+    request<{ item: TopologyItem }>('/api/kueue/topologies', { method: 'POST', body: JSON.stringify(body) }),
+  deleteTopology: (name: string) => request<{ status: string }>(`/api/kueue/topologies/${name}`, { method: 'DELETE' }),
+  priorityClasses: () => request<{ items: PriorityClassItem[] }>('/api/kueue/priority-classes'),
+  createPriorityClass: (body: {
+    name: string;
+    value: number;
+    description: string;
+    namespaces: string[];
+    applyToExisting: boolean;
+  }) =>
+    request<{ item: PriorityClassItem; applied: Record<string, PriorityApplyResult> }>('/api/kueue/priority-classes', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    }),
+  updatePriorityClass: (
+    name: string,
+    body: { name: string; value: number; description: string; namespaces: string[]; applyToExisting: boolean }
+  ) =>
+    request<{ item: PriorityClassItem; applied: Record<string, PriorityApplyResult> }>(
+      `/api/kueue/priority-classes/${name}`,
+      { method: 'PUT', body: JSON.stringify(body) }
+    ),
+  deletePriorityClass: (name: string) =>
+    request<{ status: string }>(`/api/kueue/priority-classes/${name}`, { method: 'DELETE' }),
+  setNamespacePriority: (name: string, body: { priorityClass: string | null; applyToExisting: boolean }) =>
+    request<{ name: string; priorityClass: string | null; applied: PriorityApplyResult | null }>(
+      `/api/kueue/namespaces/${name}/priority`,
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
+  setNamespaceTas: (
+    name: string,
+    body: { required: string | null; preferred: string | null; applyToExisting: boolean }
+  ) =>
+    request<{ name: string; tasRequired: string | null; tasPreferred: string | null }>(
+      `/api/kueue/namespaces/${name}/tas`,
+      { method: 'POST', body: JSON.stringify(body) }
+    ),
   integrations: () => request<{ frameworks: string[]; knownFrameworks: string[]; available: boolean }>('/api/kueue/integrations'),
   saveIntegrations: (frameworks: string[]) =>
     request<{ frameworks: string[] }>('/api/kueue/integrations', {

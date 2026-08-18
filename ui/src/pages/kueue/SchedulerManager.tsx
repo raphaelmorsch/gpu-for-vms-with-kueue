@@ -243,6 +243,42 @@ export const SchedulerManager: React.FunctionComponent = () => {
                 </CardBody>
               </Card>
             </GridItem>
+            <GridItem span={12} xl={6}>
+              <Card isFullHeight>
+                <CardTitle>Topology-Aware Scheduling</CardTitle>
+                <CardBody>
+                  <Content component="h2">{data.topologies?.total ?? 0}</Content>
+                  <Content component="p">
+                    Topologies: {(data.topologies?.names || []).join(', ') || 'nenhuma'}. Flavors com TAS:{' '}
+                    {(data.topologies?.tasFlavors || []).join(', ') || 'nenhum'}.
+                  </Content>
+                  <Content component="small">
+                    Gerido em Queue Manager → Topology (TAS). Ligar um flavor de GPU a uma Topology activa o
+                    scheduling consciente da topologia.
+                  </Content>
+                </CardBody>
+              </Card>
+            </GridItem>
+            <GridItem span={12} xl={6}>
+              <Card isFullHeight>
+                <CardTitle>WorkloadPriorityClasses</CardTitle>
+                <CardBody>
+                  {(data.priorityClasses || []).length ? (
+                    (data.priorityClasses || []).map((item) => (
+                      <Label key={item.name} style={{ marginRight: '0.5rem', marginBottom: '0.5rem' }}>
+                        {item.name} = {item.value}
+                      </Label>
+                    ))
+                  ) : (
+                    <Content component="p">Nenhuma classe definida.</Content>
+                  )}
+                  <Content component="small">
+                    Associe classes a namespaces em Queue Manager → Priority classes. Workloads novos herdam o rótulo
+                    kueue.x-k8s.io/priority-class.
+                  </Content>
+                </CardBody>
+              </Card>
+            </GridItem>
             <GridItem span={12}>
               <Card>
                 <CardTitle>ClusterQueues no scheduler</CardTitle>

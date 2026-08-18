@@ -67,12 +67,24 @@ export interface VirtualMachine {
   status: string;
   ready: boolean;
   queue?: string;
+  priorityClass?: string;
   gpus: Record<string, string>;
   runStrategy: string;
   creationTimestamp?: string;
   managed: boolean;
   username?: string;
   password?: string;
+}
+
+export interface WorkloadTopologyDomain {
+  levels: string[];
+  values: string[];
+  count: number;
+}
+
+export interface WorkloadTopology {
+  podSet: string;
+  domains: WorkloadTopologyDomain[];
 }
 
 export interface Workload {
@@ -85,6 +97,9 @@ export interface Workload {
   clusterQueue?: string;
   resources: Record<string, string>;
   creationTimestamp?: string;
+  priority?: number | null;
+  priorityClass?: string;
+  topology?: WorkloadTopology[];
 }
 
 export interface CatalogResource {
@@ -99,6 +114,7 @@ export interface CatalogResource {
 export interface CatalogFlavor {
   name: string;
   nodeLabels: Record<string, string>;
+  topologyName?: string;
 }
 
 export interface QuotaRow {
@@ -134,6 +150,9 @@ export interface KueueNamespace {
   managed: boolean;
   system: boolean;
   protected: boolean;
+  defaultPriorityClass?: string | null;
+  tasRequired?: string | null;
+  tasPreferred?: string | null;
 }
 
 export interface AdminLocalQueue {
@@ -149,6 +168,42 @@ export interface ResourceFlavorItem {
   name: string;
   nodeLabels: Record<string, string>;
   topologyName?: string;
+  inUse?: boolean;
+}
+
+export interface TopologyNode {
+  label: string;
+  value: string;
+  nodes: number;
+  gpus: number;
+  missing?: boolean;
+  nodeNames?: string[];
+  children?: TopologyNode[];
+}
+
+export interface TopologyItem {
+  name: string;
+  levels: string[];
+  flavors: string[];
+  inUse: boolean;
+  tree: TopologyNode[];
+  nodeCount?: number;
+}
+
+export interface PriorityClassItem {
+  name: string;
+  value: number;
+  description: string;
+  namespaces: string[];
+  workloads: number;
+}
+
+export interface PriorityApplyResult {
+  workloads: number;
+  jobs: number;
+  pods: number;
+  virtualMachines: number;
+  errors: string[];
 }
 
 export interface PermissionCheck {
@@ -177,6 +232,8 @@ export interface KueueDashboard {
   };
   localQueues: number;
   flavors: string[];
+  topologies?: { total: number; names: string[]; tasFlavors: string[] };
+  priorityClasses?: { name: string; value: number }[];
   workloads: { total: number; admitted: number; pending: number; finished: number };
   coveredResources: string[];
   permissions: PermissionCheck[];

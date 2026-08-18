@@ -184,6 +184,7 @@ export const VirtualMachines: React.FunctionComponent = () => {
                 <Th>Namespace</Th>
                 <Th>Estado</Th>
                 <Th>Fila Kueue</Th>
+                <Th>Prioridade</Th>
                 <Th>GPU (requests/limits)</Th>
                 <Th>Estratégia</Th>
                 <Th />
@@ -198,6 +199,7 @@ export const VirtualMachines: React.FunctionComponent = () => {
                     <Label color={statusColor(vm.status)}>{vm.status}</Label>
                   </Td>
                   <Td dataLabel="Fila Kueue">{vm.queue || '—'}</Td>
+                  <Td dataLabel="Prioridade">{vm.priorityClass || '—'}</Td>
                   <Td dataLabel="GPU (requests/limits)">{gpuCell(vm.gpus)}</Td>
                   <Td dataLabel="Estratégia">{vm.runStrategy}</Td>
                   <Td isActionCell>

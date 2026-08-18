@@ -4,6 +4,8 @@ import { ClusterQueuesPanel } from './ClusterQueuesPanel';
 import { FlavorsPanel } from './FlavorsPanel';
 import { LocalQueuesPanel } from './LocalQueuesPanel';
 import { NamespacesPanel } from './NamespacesPanel';
+import { PriorityClassesPanel } from './PriorityClassesPanel';
+import { TopologyPanel } from './TopologyPanel';
 
 export const QueueManager: React.FunctionComponent = () => {
   const [activeKey, setActiveKey] = useState<string | number>('namespaces');
@@ -13,8 +15,9 @@ export const QueueManager: React.FunctionComponent = () => {
       <PageSection>
         <Title headingLevel="h1">Queue Manager</Title>
         <Content component="p">
-          Controla os artefactos de fila do Kueue no OpenShift: namespaces geridos, ClusterQueues, LocalQueues e
-          ResourceFlavors. As reservas de GPU continuam na aba Reservas.
+          Controla os artefactos de fila do Kueue no OpenShift: namespaces geridos, ClusterQueues, LocalQueues,
+          ResourceFlavors, Topology-Aware Scheduling e WorkloadPriorityClasses. As reservas de GPU continuam na aba
+          Reservas.
         </Content>
       </PageSection>
       <PageSection type="tabs">
@@ -29,6 +32,8 @@ export const QueueManager: React.FunctionComponent = () => {
           <Tab eventKey="clusterqueues" title={<TabTitleText>ClusterQueues</TabTitleText>} />
           <Tab eventKey="localqueues" title={<TabTitleText>LocalQueues</TabTitleText>} />
           <Tab eventKey="flavors" title={<TabTitleText>ResourceFlavors</TabTitleText>} />
+          <Tab eventKey="topology" title={<TabTitleText>Topology (TAS)</TabTitleText>} />
+          <Tab eventKey="priority" title={<TabTitleText>Priority classes</TabTitleText>} />
         </Tabs>
       </PageSection>
       <PageSection>
@@ -36,6 +41,8 @@ export const QueueManager: React.FunctionComponent = () => {
         {activeKey === 'clusterqueues' && <ClusterQueuesPanel />}
         {activeKey === 'localqueues' && <LocalQueuesPanel />}
         {activeKey === 'flavors' && <FlavorsPanel />}
+        {activeKey === 'topology' && <TopologyPanel />}
+        {activeKey === 'priority' && <PriorityClassesPanel />}
       </PageSection>
     </>
   );

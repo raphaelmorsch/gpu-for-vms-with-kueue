@@ -8,6 +8,8 @@ import {
   Form,
   FormGroup,
   FormHelperText,
+  FormSelect,
+  FormSelectOption,
   HelperText,
   HelperTextItem,
   Modal,
@@ -22,7 +24,7 @@ import {
 import CubesIcon from '@patternfly/react-icons/dist/esm/icons/cubes-icon';
 import { ActionsColumn, Table, Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table';
 import { api } from '../../api';
-import type { ResourceFlavorItem } from '../../types';
+import type { ResourceFlavorItem, TopologyItem } from '../../types';
 
 const parseLabels = (value: string): Record<string, string> => {
   const labels: Record<string, string> = {};
@@ -53,10 +55,13 @@ export const FlavorsPanel: React.FunctionComponent = () => {
   const [editing, setEditing] = useState<ResourceFlavorItem | null>(null);
   const [name, setName] = useState('');
   const [labels, setLabels] = useState('');
+  const [topologyName, setTopologyName] = useState('');
+  const [topologies, setTopologies] = useState<TopologyItem[]>([]);
 
   const load = useCallback(async () => {
-    const result = await api.flavors();
-    setItems(result.items);
+    const [flavors, topology] = await Promise.all([api.flavors(), api.topologies()]);
+    setItems(flavors.items);
+    setTopologies(topology.items);
   }, []);
 
   useEffect(() => {
@@ -69,6 +74,7 @@ export const FlavorsPanel: React.FunctionComponent = () => {
     setEditing(null);
     setName('gpu-pool');
     setLabels('run.ai/simulated-gpu-node-pool=default');
+    setTopologyName('');
     setIsOpen(true);
   };
 
@@ -76,13 +82,14 @@ export const FlavorsPanel: React.FunctionComponent = () => {
     setEditing(item);
     setName(item.name);
     setLabels(formatLabels(item.nodeLabels));
+    setTopologyName(item.topologyName || '');
     setIsOpen(true);
   };
 
   const onSave = async () => {
     setIsSaving(true);
     setError(null);
-    const body = { name, nodeLabels: parseLabels(labels) };
+    const body = { name, nodeLabels: parseLabels(labels), topologyName: topologyName || null };
     try {
       if (editing) {
         await api.updateFlavor(editing.name, body);
@@ -179,12 +186,38 @@ export const FlavorsPanel: React.FunctionComponent = () => {
               <TextInput
                 id="flavor-labels"
                 value={labels}
+                isDisabled={Boolean(editing?.topologyName)}
                 onChange={(_e, value) => setLabels(value)}
                 placeholder="kubernetes.io/os=linux, run.ai/simulated-gpu-node-pool=default"
               />
               <FormHelperText>
                 <HelperText>
-                  <HelperTextItem>Lista chave=valor separada por vírgulas. Pode ficar vazia.</HelperTextItem>
+                  <HelperTextItem>
+                    {editing?.topologyName
+                      ? 'Node labels e topologyName são imutáveis neste flavor porque o TAS já está activo.'
+                      : 'Lista chave=valor separada por vírgulas. Obrigatória se ligar uma Topology.'}
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+            <FormGroup label="Topology (TAS)" fieldId="flavor-topology">
+              <FormSelect
+                id="flavor-topology"
+                value={topologyName}
+                isDisabled={Boolean(editing?.topologyName)}
+                onChange={(_event, next) => setTopologyName(next)}
+                aria-label="Topology do ResourceFlavor"
+              >
+                <FormSelectOption value="" label="Sem TAS" />
+                {topologies.map((item) => (
+                  <FormSelectOption key={item.name} value={item.name} label={`${item.name} (${item.levels.join(' → ')})`} />
+                ))}
+              </FormSelect>
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    Depois de gravar topologyName, o spec deste ResourceFlavor deixa de poder ser alterado.
+                  </HelperTextItem>
                 </HelperText>
               </FormHelperText>
             </FormGroup>

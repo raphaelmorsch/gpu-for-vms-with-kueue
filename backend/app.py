@@ -23,6 +23,12 @@ KUBEVIRT_GROUP = "kubevirt.io"
 KUBEVIRT_VERSION = "v1"
 HCO_GROUP = "hco.kubevirt.io"
 APP_LABEL = "gpu-vm-kueue.io/reservation"
+PRIORITY_CLASS_LABEL = "kueue.x-k8s.io/priority-class"
+PRIORITY_CLASS_NS_ANNOTATION = "gpu-vm-kueue.io/default-priority-class"
+TAS_REQUIRED_ANNOTATION = "kueue.x-k8s.io/podset-required-topology"
+TAS_PREFERRED_ANNOTATION = "kueue.x-k8s.io/podset-preferred-topology"
+TAS_REQUIRED_NS_ANNOTATION = "gpu-vm-kueue.io/tas-required-topology"
+TAS_PREFERRED_NS_ANNOTATION = "gpu-vm-kueue.io/tas-preferred-topology"
 GPU_RESOURCES = (
     "nvidia.com/gpu",
     "nvidia.com/mig-1g.23gb",
@@ -49,6 +55,7 @@ def load_kube() -> None:
 load_kube()
 core = client.CoreV1Api()
 apps = client.AppsV1Api()
+batch = client.BatchV1Api()
 rbac = client.RbacAuthorizationV1Api()
 custom = client.CustomObjectsApi()
 api_client = custom.api_client
@@ -124,6 +131,104 @@ def _get(group: str, version: str, plural: str, name: str, namespace: str | None
     if namespace:
         return custom.get_namespaced_custom_object(group, version, namespace, plural, name)
     return custom.get_cluster_custom_object(group, version, plural, name)
+
+
+def _namespace_kueue_defaults(namespace: str) -> dict[str, str | None]:
+    try:
+        ns = core.read_namespace(namespace)
+    except ApiException:
+        return {"priorityClass": None, "tasRequired": None, "tasPreferred": None}
+    anns = ns.metadata.annotations or {}
+    return {
+        "priorityClass": anns.get(PRIORITY_CLASS_NS_ANNOTATION) or None,
+        "tasRequired": anns.get(TAS_REQUIRED_NS_ANNOTATION) or None,
+        "tasPreferred": anns.get(TAS_PREFERRED_NS_ANNOTATION) or None,
+    }
+
+
+def _flatten_topology_assignment(assignment: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not assignment:
+        return []
+    levels = list(assignment.get("levels") or [])
+    domains = assignment.get("domains") or []
+    if domains:
+        return [
+            {
+                "levels": levels,
+                "values": list(domain.get("values") or []),
+                "count": int(domain.get("count") or 0),
+            }
+            for domain in domains
+        ]
+    flattened: list[dict[str, Any]] = []
+    for sl in assignment.get("slices") or []:
+        domain_count = int(sl.get("domainCount") or 0)
+        values_per_level: list[list[str]] = []
+        for level in sl.get("valuesPerLevel") or []:
+            if not isinstance(level, dict):
+                values_per_level.append(["?"] * domain_count)
+                continue
+            if "universal" in level:
+                values_per_level.append([str(level["universal"])] * domain_count)
+                continue
+            individual = level.get("individual") or {}
+            prefix = str(individual.get("prefix") or "")
+            suffix = str(individual.get("suffix") or "")
+            roots = individual.get("roots") or []
+            values_per_level.append([f"{prefix}{root}{suffix}" for root in roots])
+        pod_counts = sl.get("podCounts") or {}
+        if isinstance(pod_counts, dict) and "universal" in pod_counts:
+            counts = [int(pod_counts["universal"])] * domain_count
+        elif isinstance(pod_counts, dict):
+            counts = [int(item) for item in pod_counts.get("individual") or []]
+        else:
+            counts = []
+        for index in range(domain_count):
+            values = [
+                level_values[index] if index < len(level_values) else "?"
+                for level_values in values_per_level
+            ]
+            flattened.append(
+                {
+                    "levels": levels,
+                    "values": values,
+                    "count": counts[index] if index < len(counts) else 0,
+                }
+            )
+    return flattened
+
+
+def _summarize_workload(wl: dict[str, Any]) -> dict[str, Any]:
+    status = wl.get("status") or {}
+    spec = wl.get("spec") or {}
+    meta = wl.get("metadata") or {}
+    conditions = {c.get("type"): c for c in status.get("conditions") or []}
+    podsets = (status.get("admission") or {}).get("podSetAssignments") or []
+    resources: dict[str, str] = {}
+    topology: list[dict[str, Any]] = []
+    for assignment in podsets:
+        usage = assignment.get("resourceUsage") or {}
+        for key, val in usage.items():
+            resources[str(key)] = str(val)
+        domains = _flatten_topology_assignment(assignment.get("topologyAssignment"))
+        if domains:
+            topology.append({"podSet": assignment.get("name") or "main", "domains": domains})
+    priority_ref = spec.get("priorityClassRef") or {}
+    labels = meta.get("labels") or {}
+    return {
+        "name": meta.get("name"),
+        "namespace": meta.get("namespace"),
+        "queue": spec.get("queueName"),
+        "admitted": (conditions.get("Admitted") or {}).get("status") == "True",
+        "finished": (conditions.get("Finished") or {}).get("status") == "True",
+        "quotaReserved": (conditions.get("QuotaReserved") or {}).get("status") == "True",
+        "clusterQueue": (status.get("admission") or {}).get("clusterQueue"),
+        "resources": resources,
+        "creationTimestamp": meta.get("creationTimestamp"),
+        "priority": spec.get("priority"),
+        "priorityClass": priority_ref.get("name") or labels.get(PRIORITY_CLASS_LABEL),
+        "topology": topology,
+    }
 
 
 def _qty(value: Any) -> int:
@@ -290,6 +395,15 @@ def _localqueue_body(namespace: str) -> dict[str, Any]:
 
 def _vm_body(req: VirtualMachineRequest, password: str) -> dict[str, Any]:
     gpu = {req.gpu_resource: str(req.gpu_count)}
+    defaults = _namespace_kueue_defaults(req.namespace)
+    extra_labels: dict[str, str] = {}
+    extra_annotations: dict[str, str] = {}
+    if defaults.get("priorityClass"):
+        extra_labels[PRIORITY_CLASS_LABEL] = str(defaults["priorityClass"])
+    if defaults.get("tasRequired"):
+        extra_annotations[TAS_REQUIRED_ANNOTATION] = str(defaults["tasRequired"])
+    if defaults.get("tasPreferred"):
+        extra_annotations[TAS_PREFERRED_ANNOTATION] = str(defaults["tasPreferred"])
     return {
         "apiVersion": f"{KUBEVIRT_GROUP}/{KUBEVIRT_VERSION}",
         "kind": "VirtualMachine",
@@ -301,7 +415,9 @@ def _vm_body(req: VirtualMachineRequest, password: str) -> dict[str, Any]:
                 "gpu-vm-kueue.io/managed": "true",
                 "kueue.x-k8s.io/queue-name": req.queue,
                 "vm.kubevirt.io/template": "fedora-server-gpu-kueue",
+                **extra_labels,
             },
+            **({"annotations": extra_annotations} if extra_annotations else {}),
         },
         "spec": {
             "runStrategy": req.run_strategy,
@@ -328,7 +444,9 @@ def _vm_body(req: VirtualMachineRequest, password: str) -> dict[str, Any]:
                         "kueue.x-k8s.io/queue-name": req.queue,
                         "gpu-vm-kueue.io/managed": "true",
                         "network.kubevirt.io/headlessService": "headless",
-                    }
+                        **extra_labels,
+                    },
+                    **({"annotations": extra_annotations} if extra_annotations else {}),
                 },
                 "spec": {
                     "domain": {
@@ -417,6 +535,7 @@ def _summarize_vm(vm: dict[str, Any]) -> dict[str, Any]:
         "ready": bool(status.get("ready")),
         "queue": labels.get("kueue.x-k8s.io/queue-name")
         or template_labels.get("kueue.x-k8s.io/queue-name"),
+        "priorityClass": labels.get(PRIORITY_CLASS_LABEL) or template_labels.get(PRIORITY_CLASS_LABEL),
         "gpus": _gpu_from_vm(vm),
         "runStrategy": spec.get("runStrategy") or (spec.get("running") and "Always") or "Halted",
         "creationTimestamp": meta.get("creationTimestamp"),
@@ -764,38 +883,7 @@ def list_workloads(namespace: str | None = None) -> dict[str, Any]:
         items = _list_namespaced(KUEUE_GROUP, KUEUE_VERSION, "workloads", namespace)
     else:
         items = _list_cluster(KUEUE_GROUP, KUEUE_VERSION, "workloads")
-    summarized = []
-    for wl in items:
-        status = wl.get("status", {})
-        conditions = {c.get("type"): c for c in status.get("conditions") or []}
-        podsets = status.get("admission", {}).get("podSetAssignments") or []
-        resources: dict[str, str] = {}
-        for assignment in podsets:
-            flavors = assignment.get("flavors") or {}
-            usage = assignment.get("resourceUsage") or {}
-            for key, val in {**flavors, **usage}.items():
-                if isinstance(val, dict):
-                    continue
-                resources[str(key)] = str(val)
-            for flavor_usage in assignment.get("flavors") and [] or []:
-                pass
-            ru = assignment.get("resourceUsage") or {}
-            for key, val in ru.items():
-                resources[key] = str(val)
-        summarized.append(
-            {
-                "name": wl.get("metadata", {}).get("name"),
-                "namespace": wl.get("metadata", {}).get("namespace"),
-                "queue": wl.get("spec", {}).get("queueName"),
-                "admitted": conditions.get("Admitted", {}).get("status") == "True",
-                "finished": conditions.get("Finished", {}).get("status") == "True",
-                "quotaReserved": conditions.get("QuotaReserved", {}).get("status") == "True",
-                "clusterQueue": (status.get("admission") or {}).get("clusterQueue"),
-                "resources": resources,
-                "creationTimestamp": wl.get("metadata", {}).get("creationTimestamp"),
-            }
-        )
-    return {"items": summarized}
+    return {"items": [_summarize_workload(wl) for wl in items]}
 
 
 from kueue_admin import router as kueue_router
